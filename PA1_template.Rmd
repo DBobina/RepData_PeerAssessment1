@@ -1,25 +1,155 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Peer-graded Assignment: Course Project 1'
+author: "Dan"
+date: "4/30/2017"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
 
-## Loading and preprocessing the data
+## TASK 1 - What is mean total number of steps taken per day?
 
+SUBTASK 1.1 - Calculate the total number of steps taken per day
+```{r subtask 1.1}
+dt <- read.csv(file="activity.csv", header=TRUE, sep=",")
 
+dt$date <- as.Date(as.character(dt$date), "%Y-%m-%d")
 
-## What is mean total number of steps taken per day?
+agg<- aggregate(steps~date, data=dt, sum)
+```
 
+SUBTASK 1.2 - If you do not understand the difference between a histogram and a 
+barplot, research the difference between them. Make a histogram of the total number 
+of steps taken each day
 
+```{r subtask 1.2}
+## nice plot wiht the total steps per day, but we can't use it as we need a histogram
+##g <- ggplot(data=agg, aes(factor(date), steps)) + geom_bar(stat="identity") +
+##     theme(axis.text.x  = element_text(angle=90)) +
+##     xlab("Date")  
+## histogram with total number of steps per day
+g <- hist(agg$steps, main="Histogram of total number of steps per day", 
+     xlab="Total number of steps in a day")
+```
 
-## What is the average daily activity pattern?
+SUBTASK 1.3 - Calculate and report the mean and median of the total number of steps taken per day
 
+```{r subtask 1.3}
+s <- summary(agg)
+print(paste("Total number of steps taken per day, ", s[9]))
+print(paste("Total number of steps taken per day, ", s[10]))
+```
+##  TASK 2 - IWhat is the average daily activity pattern?
+SUBTASK 2.1 - Make a time series plot of the 5-minute interval (x-axis) and the average 
+number of steps taken, averaged across all days (y-axis)
+```{r subtask 2.1}
+agg<- aggregate(steps~interval, data=dt, mean)
+g <- ggplot(agg, 
+            aes(x=interval,
+                y=steps)) +
+            geom_line() +
+            ggtitle("Average number of steps taken across all days at 5-minute interval") +
+            theme(plot.title = element_text(face="bold.italic"))
+print(g)
+```
 
+SUBTASK 2.2 - Which 5-minute interval, on average across all the days in the dataset, 
+contains the maximum number of steps?
+```{r subtask 2.2}
+agg <- aggregate(steps~interval, mean, data = dt)
+print(paste("The 5-minute interval, on average across all the days in the dataset, that contains the maximum number of steps: ", subset(agg, agg$steps == max(agg$steps))$interval))
+```
 
-## Imputing missing values
+##  TASK 3 - Imputing missing values
+SUBTASK 3.1 - Calculate and report the total number of missing values in the dataset
+(i.e. the total number of rows with 𝙽𝙰s)
+```{r subtask 3.1}
+print(paste("The total number of missing values in the dataset:", nrow(dt[!complete.cases(dt),])))
+```
 
+SUBTASK 3.2 - Devise a strategy for filling in all of the missing values in the dataset. 
+The strategy does not need to be sophisticated. For example, you could use the mean/median 
+for that day, or the mean for that 5-minute interval, etc.
+```{r subtask 3.2}
+##Since all values for every day that contains NA's are NA's we can't use the mean/median for that day to fill the NA's
+##so we will use the 5-minute average to fill all the NA's
+agg3 <- dt[complete.cases(dt),]
+agg3 <- aggregate(steps~interval, data=agg3, mean)
+##t distinct dates into a variable
+uniqueDT <- unique(dt$date)
+##loop through the distinct dates
+for (i in 1:length(uniqueDT))
+{
+    ##get ALL rows for the date selected
+    sub = subset(dt, dt$date == uniqueDT[i])
+    ##check if any NA's exist for a certain date
+    if(anyNA(sub))
+    {
+        ##check if ALL values for this date are NA's
+        if(nrow(sub[complete.cases(sub),]) == 0)
+        {
+            print(paste("All values are NA's for this date >" ,uniqueDT[i]))    
+        }
+    }
+}
 
+names(agg3) <- c("agginterval", "aggsteps")
+##append the mean at 5-min interval to original data frame and create new data frame
+both <- cbind(dt, agg3)
+myf <- function(setps, aggsteps) { 
+        ifelse(is.na(setps), aggsteps, setps) 
+        }
+##create new column by taking non NA's from either steps(if not NA) or 5-min mean
+for (row in 1:nrow(both)) { 
+    both$newvar[row] <- myf(both$steps[row], both$aggsteps[row]) 
+}
+##create new data frame by taking 3 columns from data frame above
+newdt <- both[c("newvar", "date", "interval")]
+##rename first column
+names(newdt)[1]<-"steps"
+```
+SUBTASK 3.3 - Make a histogram of the total number of steps taken each day and Calculate and report the 
+mean and median total number of steps taken per day. Do these values differ from the estimates 
+from the first part of the assignment? What is the impact of imputing missing data on the estimates 
+of the total daily number of steps?
+```{r subtask 3.3}
+agg4<- aggregate(steps~date, data=newdt, sum)
+## histogram with total number of steps per day
+g <- hist(agg4$steps, main="Histogram of total number of steps per day", 
+          xlab="Total number of steps in a day")
 
-## Are there differences in activity patterns between weekdays and weekends?
+agg4 <- aggregate(steps~date, data=newdt, sum)
+s <- summary(agg4)
+print(paste("Total number of steps taken per day, ", s[9]))
+print(paste("Total number of steps taken per day, ", s[10]))
+print("New Median is like the Mean")
+```
+
+##  TASK 4 - Are there differences in activity patterns between weekdays and weekends?
+SUBTASK 4.1 - Create a new factor variable in the dataset with two levels – 
+“weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r subtask 4.1}
+newdt$weekday <- as.factor(ifelse(weekdays(newdt$date) %in% c("Saturday", "Sunday"), "weekend", "weekday"))
+```
+
+SUBTASK 4.2 - Make a panel plot containing a time series plot (i.e type="l") of the 5-minute interval 
+(x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+See the README file in the GitHub repository to see an example of what this plot should look like 
+using simulated data.
+```{r subtask 4.2}
+newdtagg <- aggregate(steps~interval+weekday, data=newdt, mean)
+
+g <- ggplot( data = newdtagg,
+             aes(x=interval, y=steps, 
+                   fill=weekday, color=weekday))  + 
+            geom_line(alpha=0.3) +
+            geom_smooth() + 
+            facet_wrap( ~ weekday, ncol=1) +
+            theme(legend.position="none") + 
+            labs(x="Interval", y="Number of steps")
+
+print(g)
+```
